@@ -1,0 +1,145 @@
+---
+title: "reproducible_code"
+author: "Chuying Wang"
+date: "2023-12-03"
+output: html_document
+---
+
+### Introduction
+In this data analysis pipeline, we will explore raw data embedded in the "palmerpenguins" package and carry out some explorative data visualizations to sort out a plausible hypothesis. Then, we will discuss biological assumptions and reasoning behind the hypothesis, as well as carry out statistical analysis for the hypothesis to test for statistic significance. Finally, we will generate a plot to visualize our finding, discuss insights that can be drawn from the figure, and make some general conclusions from our observation. 
+
+Firstly, we'll install and load packages required.
+```{r, results='hide'}
+# Install packages
+install.packages("ggplot2")
+install.packages("palmerpenguins")
+install.packages("janitor")
+install.packages("dplyr")
+install.packages("ragg")
+
+# Load packages
+library(ggplot2)
+library(palmerpenguins)
+library(janitor)
+library(dplyr)
+library(ragg)
+```
+
+Next, we can store the raw data in a separate .csv file. This allows us to keep an unchanged record of the raw data. Once we have done that, we can then carry out some data cleaning to make the column names more concise and remove unwanted columns. 
+
+```{r}
+write.csv(penguins_raw, "penguins_raw.csv")
+
+# Have a look at the column names in raw data
+names(penguins_raw)
+
+# Clean data
+penguins_data <- penguins_raw %>% 
+  select(-starts_with("Delta")) %>% #remove columns that starts with Delta
+  select(-Comments) %>% #remove the column "Comments"
+  clean_names() #clean colume names with the janitor package to fix spaces and capital letters
+
+# Have a look at the cleaned column names
+names(penguins_data)
+
+# remove data containing NAs for variables of interest
+penguins_clean <- na.omit(penguins_data)
+```
+
+With the cleaned data, we can carry out some explorative manipulations. First, I'd like to look at distributions of body mass and flipper length between sexes. Let's use histograms to visualize them and save them to a folder called "figures".
+```{r Data Exploration}
+# distribution of body mass in males and females
+explorative_mass_histogram <- ggplot(penguins_clean, aes(x = body_mass_g)) +
+  geom_histogram(aes(fill = sex)) +
+  theme_bw()
+explorative_mass_histogram
+
+# save the figure
+agg_png("figures/explorative_mass_histogram.png", 
+        width = 1000, height = 600, units = "px",res=200)
+explorative_mass_histogram
+dev.off()
+
+# distribution of flipper length in males and females=
+explorative_flipper_histogram <- ggplot(penguins_clean, aes(x = flipper_length_mm)) +
+  geom_histogram(aes(fill = sex)) +
+  theme_bw() 
+explorative_flipper_histogram
+
+# save the figure
+agg_png("figures/explorative_flipper_histogram.png", 
+        width = 1000, height = 600, units = "px",res=200)
+explorative_flipper_histogram
+dev.off()
+```
+
+It looks like that in all three species, males have longer flippers and higher body mass than females. Therefore, I thinks it would be interesting to look at the association between flipper length and body mass in both sexes.
+
+```{r}
+# plot body mass and flipper length by labelling sex
+explorative_scatter_plot <- ggplot(penguins_clean, aes(x = body_mass_g, y = flipper_length_mm)) +
+  geom_point(aes(colour = sex)) +
+  theme_bw() 
+explorative_scatter_plot
+
+# save the figure
+agg_png("figures/explorative_scatter_plot.png", 
+        width = 1000, height = 600, units = "px",res=200)
+explorative_scatter_plot
+dev.off()
+```
+
+### Hypothesis
+The explorative plots show a positive correlation between body mass and flipper length in both sexes. Therefore, I would like to test the statistical significance of this positive correlation and generate a result figure based on this. 
+
+In this case, my hypothesis is that body mass is positively associated with flipper length in both sexes. 
+
+### Statistical Methods
+
+To test this hypothesis, we need to subset the data based on sex and fit a linear regression model to each subset to test the statistical significance. 
+```{r Statistics}
+# Subset data by sex
+penguins_males <- subset(penguins_clean, sex == "MALE")
+penguins_females <- subset(penguins_clean, sex == "FEMALE")
+
+# fit a linear regression model to males
+model_males <- lm(body_mass_g ~ flipper_length_mm, data = penguins_males)
+summary(model_males) #look at the model
+
+# fit a linear regression model to females
+model_females <- lm(body_mass_g ~ flipper_length_mm, data = penguins_females)
+summary(model_females) #look at the model
+```
+
+
+### Results & Discussion
+
+Now, let's visualize our data on a final results figure
+```{r Plotting Results}
+# Create the results figure
+result_plot <- ggplot(penguins_clean, aes(x = body_mass_g, y = flipper_length_mm)) +
+  geom_point(aes(colour = sex), alpha = 0.7) +
+  theme_bw() +
+  labs(x = "Body Mass (g)",
+    y = "Flipper Length (mm)",
+    title = "Relationship between Body Mass and Flipper Length in Palmer Penguins",
+    color = "Sex") +
+  geom_smooth(method = lm, se = TRUE, aes(color = sex)) +
+  annotate("text", x = 5500, y = 200, label = "Male: p < 2e-16, adj R² = 0.7476", color = "blue", size = 3.5) +
+  annotate("text", x = 3500, y = 220, label = "Female: p < 2e-16, adj R² = 0.7816", color = "red", size = 3.5)
+
+result_plot
+
+# save the figure
+agg_png("figures/explorative_scatter_plot.png", 
+        width = 1000, height = 600, units = "px",res=150)
+result_plot
+dev.off()
+```
+Both the statistical analysis and the results figure support my hypothesis. According to the linear regression model for males, the slope of the regression line is 46.859, indicating a strong positive relationship between the two variables. The p-value is lower than 2.2e-16, indicating that the result is statistically significant. In addition, the adjusted R-squared value is 0.7476, which means 74.76% of variations in the data can be explained by the model. Therefore it is reasonable to conclude that there is a strong positive association between body mass and flipper length in male penguins. Similarly, in females, the regression coefficient is 47.153, and the result is statistically significant (p-value < 2.2e-16). The model explains 78.16% of the total variation. Therefore, a strong positive correlation between body mass and flipper length is also observed in females.
+
+The positive correlation between body mass and flipper length is visualized by the results figure. In this figure, data points of females are shown in red, while data points derived from males are indicated in blue. A strong positive correlation is observed in both cases, according to the regression line generated for each sex. The shaded area around the smooth lines indicate the confidence interval of the regression lines. In both cases, the slope of the regression line looks quite steep. The results are relatively easy to understand, as longer flippers are likely to contribute to greater body mass.
+
+### Conclusion
+
+Overall, the analysis reveals a positive correlation between body mass (g) and flipper length (mm) in the palmerpenguin data set, and such association is consistent across sex. While this trend is explicit and understandable, our exploratory visualizations have revealed a sexual dimorphism in terms of body mass and flipper length, where males tend to have longer flippers and larger body mass compared to females. Therefore, an interesting future study direction would be to dive further into this topic and investigate the impact on sexual selection on driving such differences. 
